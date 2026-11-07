@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "CinemaFlow — поиск фильма везде",
+  "version": "0.7.1",
+  "description": "Плавающая панель на странице фильма (IMDb, Kinorium, TMDB, Letterboxd): онлайн-кинотеатры, базы, торренты. Без встраивания в верстку сайтов.",
+  "permissions": ["storage"],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "CinemaFlow — настройки",
+    "default_icon": {
+      "16": "icon/icon_16.png",
+      "32": "icon/icon_32.png",
+      "48": "icon/icon_48.png",
+      "128": "icon/icon_128.png"
+    }
+  },
+  "icons": {
+    "16": "icon/icon_16.png",
+    "32": "icon/icon_32.png",
+    "48": "icon/icon_48.png",
+    "128": "icon/icon_128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.imdb.com/title/*",
+        "https://kinorium.com/*",
+        "https://*.kinorium.com/*",
+        "https://kinorium.net/*",
+        "https://*.kinorium.net/*",
+        "https://www.themoviedb.org/movie/*",
+        "https://letterboxd.com/film/*"
+      ],
+      "js": ["common/shared.js", "content/panel.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["defaults/catalog.json"],
+      "matches": ["https://www.imdb.com/*", "https://kinorium.com/*", "https://*.kinorium.com/*", "https://kinorium.net/*", "https://*.kinorium.net/*", "https://www.themoviedb.org/*", "https://letterboxd.com/*"]
+    }
+  ]
+}

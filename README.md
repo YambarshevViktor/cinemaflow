@@ -1,5 +1,4 @@
 # CinemaFlow
-
 Плавающая панель на карточке фильма (IMDb, Kinorium, TMDB, Letterboxd): ищет фильм везде — онлайн-кинотеатры, базы, торренты. Один клик вместо десяти вкладок.
 
 ## Что умеет
@@ -9,7 +8,7 @@
 - Свои ссылки, правка любого шаблона (✎), удаление любых записей, выбор сайтов, где показывать панель
 
 ## Установка (1 минута)
-1. Скачай [последний релиз](https://github.com/YambarshevViktor/cinemaflow/releases/latest) (`cinemaflow-vX.Y.Z.zip`) и распакуй
+1. Скачай код: зелёная кнопка **Code → Download ZIP** (или архив из [последнего релиза](https://github.com/YambarshevViktor/cinemaflow/releases/latest), если он есть) и распакуй
 2. Открой `chrome://extensions`, включи **Developer mode**
 3. **Load unpacked** → выбери распакованную папку
 4. Открой любой фильм на IMDb — панель появится справа внизу

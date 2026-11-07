@@ -1,0 +1,44 @@
+{
+  "v": 5,
+  "groups": [
+    {
+      "id": "cinemas",
+      "title": "Онлайн-кинотеатры",
+      "title_en": "Streaming",
+      "links": [
+        { "id": "hdrezka", "name": "HDRezka", "url": "https://hdrezka.ag/search/?do=search&subaction=search&q=%s", "mirrors": ["https://rezka.ag/search/?do=search&subaction=search&q=%s"], "enabled": true, "builtin": true },
+        { "id": "lordfilm", "name": "LordFilm", "url": "https://lordfilm.lu/?s=%s", "enabled": true, "builtin": true },
+        { "id": "filmix", "name": "Filmix", "url": "https://filmix.ac/search/%s", "qmode": "title", "enabled": true, "builtin": true },
+        { "id": "kinogo", "name": "KinoGo", "url": "https://kinogo.biz/index.php?do=search&subaction=search&story=%s", "enabled": false, "builtin": true },
+        { "id": "seasonvar", "name": "Seasonvar", "url": "https://seasonvar.ru/search?x=%s", "qmode": "title", "enabled": false, "builtin": true },
+        { "id": "kinokrad", "name": "KinoKrad", "url": "https://kinokrad.cc/index.php?do=search&subaction=search&story=%s", "enabled": false, "builtin": true }
+      ]
+    },
+    {
+      "id": "bases",
+      "title": "Базы и стриминги",
+      "title_en": "Databases",
+      "links": [
+        { "id": "kinorium", "name": "Kinorium", "url": "https://www.kinorium.com/search/?q=%s", "enabled": true, "builtin": true },
+        { "id": "imdb", "name": "IMDb", "url": "https://www.imdb.com/find/?q=%s", "enabled": true, "builtin": true },
+        { "id": "letterboxd", "name": "Letterboxd", "url": "https://letterboxd.com/search/films/%s/", "enabled": true, "builtin": true },
+        { "id": "rottentomatoes", "name": "Rotten Tomatoes", "url": "https://www.rottentomatoes.com/search?search=%s", "enabled": false, "builtin": true },
+        { "id": "metacritic", "name": "Metacritic", "url": "https://www.metacritic.com/search/%s/", "enabled": false, "builtin": true },
+        { "id": "tmdb", "name": "TMDB", "url": "https://www.themoviedb.org/search?query=%s", "qmode": "title", "enabled": false, "builtin": true },
+        { "id": "justwatch", "name": "JustWatch", "url": "https://www.justwatch.com/us/search?q=%s", "enabled": false, "builtin": true }
+      ]
+    },
+    {
+      "id": "torrents",
+      "title": "Торренты",
+      "title_en": "Torrents",
+      "links": [
+        { "id": "rutracker", "name": "RuTracker", "url": "https://rutracker.org/forum/tracker.php?nm=%s", "mirrors": ["https://rutracker.net/forum/tracker.php?nm=%s"], "enabled": true, "builtin": true },
+        { "id": "rutor", "name": "Rutor", "url": "https://rutor.is/search/%s", "mirrors": ["https://rutor.info/search/%s"], "enabled": true, "builtin": true },
+        { "id": "therarbg", "name": "TheRarBg", "url": "https://therarbg.com/get-posts/keywords:%s:category:Movies/", "enabled": true, "builtin": true },
+        { "id": "ext", "name": "Ext.to", "url": "https://ext.to/browse/?q=%s", "enabled": true, "builtin": true },
+        { "id": "bt4g", "name": "BT4G", "url": "https://bt4g.org/search/%s", "enabled": true, "builtin": true }
+      ]
+    }
+  ]
+}

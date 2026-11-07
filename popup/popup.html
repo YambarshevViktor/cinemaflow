@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CinemaFlow — настройки</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<div class="page">
+  <header>
+    <div>
+      <h1>CinemaFlow</h1>
+      <p class="hint" id="hint"></p>
+    </div>
+    <div class="hbtns">
+      <div class="lang" id="langSw">
+        <button id="langRu" title="Русский">RU</button><button id="langEn" title="English">EN</button>
+      </div>
+      <div class="hrow">
+        <button id="gearBtn" class="ghost icon" title="Настройки">⚙️</button>
+        <button id="resetBtn" class="ghost" title="Вернуть списки по умолчанию">Сброс</button>
+      </div>
+    </div>
+  </header>
+  <div id="groups"></div>
+  <div class="group" id="sitesBox">
+    <h2 id="sitesTitle">Сайты</h2>
+    <div id="sites"></div>
+  </div>
+  <footer>
+    <button id="copyBtn" class="ghost">⧉</button>
+    <span id="status"></span>
+    <button id="healthBtn" class="ghost">Проверить зеркала</button>
+  </footer>
+</div>
+<script src="../common/shared.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

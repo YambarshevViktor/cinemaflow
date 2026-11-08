@@ -147,8 +147,16 @@ window.CF_MERGE = function (saved, catalog) {
       for (const sl of sg.links) {
         if (!sl || !sl.id) continue;
         const cl = (cg.links || []).find((l) => l.id === sl.id);
-        if (sl.builtin && (!cl || removed.has(sl.id))) continue; // убрана из каталога или пользователем
-        if (sl.builtin && cl && movedTo[sl.id] && movedTo[sl.id] !== cg.id) continue; // переехала в другую кнопку
+        if (sl.builtin && removed.has(sl.id)) continue; // удалена пользователем
+        if (sl.builtin && !cl) {
+          // Встроенной нет в этой группе каталога: либо убрана из каталога,
+          // либо переехала в другую кнопку.
+          if (movedTo[sl.id] !== cg.id) continue;
+          links.push({ ...sl, enabled: sl.enabled !== false }); // наша переехавшая — храним как есть
+          seen.add(sl.id);
+          continue;
+        }
+        if (movedTo[sl.id] && movedTo[sl.id] !== cg.id) continue; // переехала в другую кнопку
         if (cl) {
           if (sl.edited) {
             // пользователь правит шаблон сам — каталог его не трогает

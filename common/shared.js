@@ -26,6 +26,10 @@ window.CF_STRINGS = {
     paste: 'Вставьте ссылку',
     bad_url: 'Некорректная ссылка',
     show_in_panel: 'Показывать в панели',
+    show_group: 'Показывать кнопкой в панели',
+    rename_group: 'Переименовать кнопку',
+    title_ru_ph: 'Название кнопки (RU)',
+    title_en_ph: 'Название кнопки (EN)',
     order: 'Порядок в кнопке',
     move_up: 'Выше',
     move_down: 'Ниже',
@@ -73,6 +77,10 @@ window.CF_STRINGS = {
     paste: 'Paste a link',
     bad_url: 'Invalid link',
     show_in_panel: 'Show in the panel',
+    show_group: 'Show as a button in the panel',
+    rename_group: 'Rename button',
+    title_ru_ph: 'Button label (RU)',
+    title_en_ph: 'Button label (EN)',
     order: 'Order on the button',
     move_up: 'Move up',
     move_down: 'Move down',
@@ -141,7 +149,17 @@ window.CF_MERGE = function (saved, catalog) {
       }
     }
     for (const cl of cg.links || []) if (!seen.has(cl.id) && !removed.has(cl.id)) links.push({ ...cl });
-    out.groups.push({ id: cg.id, title: cg.title, title_en: cg.title_en, links });
+    // Видимость кнопки и своё название переживают обновления каталога.
+    // titleEdited = пользователь переименовал сам — каталог названия не трогает.
+    const titleEdited = !!(sg && sg.titleEdited);
+    out.groups.push({
+      id: cg.id,
+      title: (titleEdited && sg.title) ? sg.title : cg.title,
+      title_en: (titleEdited && sg.title_en) ? sg.title_en : cg.title_en,
+      titleEdited,
+      showInPanel: !sg || sg.showInPanel !== false,
+      links,
+    });
   }
   return out;
 };

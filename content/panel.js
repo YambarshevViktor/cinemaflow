@@ -18,7 +18,6 @@
   let health = {};
 
   const tr = (key, vars) => window.CF_T(state?.lang || 'ru', key, vars);
-  const groupTitle = (g) => ((state?.lang === 'en' && g.title_en) ? g.title_en : g.title);
   const effUrl = (l) => window.CF_EFFECTIVE(l, health);
   const shortHost = (u) => {
     try { return new URL(String(u).replace('%s', 'test')).hostname.replace(/^www\./, ''); }
@@ -113,6 +112,51 @@
     if (/kinorium\.(com|net)/.test(location.href) && /\/(film|movie|series|show)/i.test(location.href)) return true;
     if (/themoviedb\.org\/movie\/\d+/.test(location.href)) return true;
     if (/letterboxd\.com\/film\/[^/]+\/?($|\?)/.test(location.href)) return true;
+    return false;
+  }
+
+  // Страницы серий/сезонов: поиск «Название S04E06» на других сайтах ничего
+  // не находит, поэтому панель там не показываем вообще.
+  function pageJsonTypes() {
+    const types = [];
+    try {
+      const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+      for (const s of scripts) {
+        try {
+          const data = JSON.parse(s.textContent);
+          const arr = Array.isArray(data) ? data : (data['@graph'] ? data['@graph'] : [data]);
+          for (const o of arr) {
+            if (!o || typeof o !== 'object') continue;
+            const t = o['@type'];
+            if (typeof t === 'string') types.push(t);
+            else if (Array.isArray(t)) types.push(...t);
+          }
+        } catch (e) { /* next script */ }
+      }
+    } catch (e) { /* ignore */ }
+    return types;
+  }
+
+  function isEpisodeUrl() {
+    const href = location.href;
+    // Kinorium: /363924/episodes/s4e6/, IMDb: /title/tt.../episodes...
+    if (/\/episodes?\//i.test(href)) return true;
+    // TMDB и прочие: /tv/.../season/1, /season/1/episode/2, /episode/5
+    if (/\/(season|episode)s?\/\d+/i.test(href)) return true;
+    // Короткий вид s4e6 в пути
+    if (/\/s\d{1,3}e\d{1,3}(\/|$|\?|#)/i.test(href)) return true;
+    // ?season=4 / ?episode=2
+    if (/[?&#](season|episode)=\d+/i.test(href)) return true;
+    return false;
+  }
+
+  function isEpisodePage() {
+    if (isEpisodeUrl()) return true;
+    // Отдельная страница серии со своим id (напр. свой /title/tt.../ у IMDb):
+    // по URL от фильма не отличить, смотрим JSON-LD.
+    try {
+      if (pageJsonTypes().includes('TVEpisode')) return true;
+    } catch (e) {}
     return false;
   }
 
@@ -383,6 +427,10 @@
     const host = ensureHost();
     const myRoot = baseDomain(currentRootHost());
     if ((state.hidden || []).includes(myRoot)) { renderHiddenPill(host, myRoot); return; }
+    if (isEpisodePage()) {
+      if (host.shadowRoot) host.shadowRoot.innerHTML = '';
+      return;
+    }
     if (closedForUrl === location.href) {
       if (host.shadowRoot) host.shadowRoot.innerHTML = '';
       return;
@@ -428,18 +476,19 @@
     head.appendChild(close);
     card.appendChild(head);
 
-    // body groups
+    // body groups: скрытые кнопкой и пустые (все выключены) не рисуем вообще
     const body = el('div', 'cf-body');
     for (const g of state.groups) {
+      if (g.showInPanel === false) continue;
       const picked = pickMainLink(g.links, myRoot) || {};
       const { main, all } = picked;
+      if (!main) continue;
       const box = el('div', 'cf-group');
 
       const btn = el('button', 'cf-btn');
-      btn.disabled = !main;
       const mainPart = el('span', 'cf-main');
-      if (main) {
-        const label = el('span', 'cf-label', `${groupTitle(g)}: ${main.name}`);
+      {
+        const label = el('span', 'cf-label', main.name);
         const eff = effUrl(main);
         const dot = el('span', 'cf-dot ' + (health[eff]?.alive === false ? 'bad' : health[eff]?.alive ? 'ok' : 'unknown'));
         mainPart.appendChild(window.CF_ICON(main.name, faviconFor(eff)));
@@ -453,8 +502,6 @@
           e.stopPropagation();
           window.open(buildSearchUrl(main, title, year), '_blank', 'noopener');
         };
-      } else {
-        mainPart.appendChild(el('span', 'cf-label', tr('none_enabled', { g: groupTitle(g) })));
       }
       const arrow = el('span', 'cf-arrow', '▾');
       btn.appendChild(mainPart);

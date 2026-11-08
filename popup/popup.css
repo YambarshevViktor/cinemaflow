@@ -23,6 +23,10 @@ h1 { font-size: 15px; margin: 0 0 4px 0; }
 .ghost:disabled { opacity: .5; cursor: default; }
 .group { border: 1px solid rgba(0,0,0,.1); border-radius: 14px; padding: 10px; margin-bottom: 10px; background: rgba(255,255,255,.7); }
 .group h2 { font-size: 13px; margin: 0 0 8px 0; }
+.ghrow { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.ghrow h2 { flex: 1; min-width: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gshow { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; opacity: .75; cursor: pointer; flex: 0 0 auto; }
+.gshow input { margin: 0; accent-color: #0a84ff; }
 .row { display: flex; align-items: flex-start; gap: 8px; padding: 6px 4px; border-radius: 9px; }
 .row:hover { background: rgba(127,127,127,.12); }
 .row > input[type=checkbox] { margin-top: 5px; flex: 0 0 auto; }

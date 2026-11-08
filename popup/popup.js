@@ -123,6 +123,10 @@ function normalizeState(s) {
   if (!Array.isArray(s.removed)) s.removed = [];
   if (!Array.isArray(s.hidden)) s.hidden = [];
   for (const g of s.groups) {
+    if (typeof g.title !== 'string' || !g.title) g.title = g.id;
+    if (typeof g.title_en !== 'string' || !g.title_en) g.title_en = g.title;
+    if (typeof g.titleEdited !== 'boolean') g.titleEdited = false;
+    if (g.showInPanel !== false) g.showInPanel = true;
     if (!Array.isArray(g.links)) g.links = [];
     for (const l of g.links) {
       if (typeof l.enabled !== 'boolean') l.enabled = true;
@@ -414,9 +418,70 @@ function render() {
   state.groups.forEach((g) => {
     const box = document.createElement('div');
     box.className = 'group';
+    // Шапка группы: название + галочка «показывать кнопкой» + ✎ переименовать.
+    // Так любую из трёх кнопок можно скрыть или отдать под своё
+    // (например, выключить все торренты и назвать кнопку по-своему).
+    const hrow = document.createElement('div');
+    hrow.className = 'ghrow';
     const h = document.createElement('h2');
     h.textContent = groupTitle(g);
-    box.appendChild(h);
+    hrow.appendChild(h);
+    const showLbl = document.createElement('label');
+    showLbl.className = 'gshow';
+    showLbl.title = tr('show_group');
+    const showCb = document.createElement('input');
+    showCb.type = 'checkbox';
+    showCb.checked = g.showInPanel !== false;
+    showCb.onchange = async () => { g.showInPanel = showCb.checked; await save(); render(); say(tr('saved')); };
+    const showT = document.createElement('span');
+    showT.textContent = '✓';
+    showLbl.appendChild(showCb);
+    showLbl.appendChild(showT);
+    hrow.appendChild(showLbl);
+    const renB = document.createElement('button');
+    renB.className = 'mini';
+    renB.textContent = '✎';
+    renB.title = tr('rename_group');
+    hrow.appendChild(renB);
+    box.appendChild(hrow);
+    let gformHost = null;
+    renB.onclick = () => {
+      if (gformHost) { gformHost.remove(); gformHost = null; return; }
+      gformHost = document.createElement('div');
+      gformHost.className = 'ehost';
+      const form = document.createElement('div');
+      form.className = 'eform';
+      const ruIn = document.createElement('input');
+      ruIn.type = 'text';
+      ruIn.value = g.title || '';
+      ruIn.placeholder = tr('title_ru_ph');
+      const enIn = document.createElement('input');
+      enIn.type = 'text';
+      enIn.value = g.title_en || '';
+      enIn.placeholder = tr('title_en_ph');
+      const btns = document.createElement('div');
+      btns.className = 'erow';
+      const ok = document.createElement('button');
+      ok.className = 'ghost';
+      ok.textContent = tr('save_btn');
+      const cancel = document.createElement('button');
+      cancel.className = 'ghost';
+      cancel.textContent = tr('cancel');
+      btns.appendChild(ok);
+      btns.appendChild(cancel);
+      form.appendChild(ruIn);
+      form.appendChild(enIn);
+      form.appendChild(btns);
+      ok.onclick = async () => {
+        g.title = ruIn.value.trim() || g.title;
+        g.title_en = enIn.value.trim() || g.title_en;
+        g.titleEdited = true; // слияние каталога свои названия не затрет
+        await save(); render(); say(tr('saved'));
+      };
+      cancel.onclick = () => render();
+      gformHost.appendChild(form);
+      hrow.after(gformHost);
+    };
 
     // Включенные — сверху по порядку, выключенные — ниже серым
     const on = g.links.filter((l) => l.enabled);

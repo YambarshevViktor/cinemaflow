@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CinemaFlow — поиск фильма везде",
-  "version": "0.7.3",
+  "version": "0.2",
   "description": "Плавающая панель на странице фильма (IMDb, Kinorium, TMDB, Letterboxd): онлайн-кинотеатры, базы, торренты. Без встраивания в верстку сайтов.",
   "permissions": ["storage"],
   "action": {

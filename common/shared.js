@@ -26,7 +26,8 @@ window.CF_STRINGS = {
     paste: 'Вставьте ссылку',
     bad_url: 'Некорректная ссылка',
     show_in_panel: 'Показывать в панели',
-    show_group: 'Показывать кнопкой в панели',
+    toggle_all: 'Включить/выключить все ссылки кнопки',
+    move_to: 'Кнопка (перенести ссылку)',
     rename_group: 'Переименовать кнопку',
     title_ru_ph: 'Название кнопки (RU)',
     title_en_ph: 'Название кнопки (EN)',
@@ -77,7 +78,8 @@ window.CF_STRINGS = {
     paste: 'Paste a link',
     bad_url: 'Invalid link',
     show_in_panel: 'Show in the panel',
-    show_group: 'Show as a button in the panel',
+    toggle_all: 'Enable/disable all links on the button',
+    move_to: 'Button (move the link)',
     rename_group: 'Rename button',
     title_ru_ph: 'Button label (RU)',
     title_en_ph: 'Button label (EN)',
@@ -124,6 +126,19 @@ window.CF_MERGE = function (saved, catalog) {
   if (saved && Array.isArray(saved.groups)) {
     for (const g of saved.groups) if (g && g.id) savedGroups[g.id] = g;
   }
+  // Карта переехавших ссылок: id встроенной ссылки -> id группы, куда её положил
+  // пользователь. Чтобы каталог не возвращал её обратно в родную группу дублем.
+  const movedTo = {};
+  if (saved && Array.isArray(saved.groups)) {
+    for (const sg of saved.groups) {
+      if (!sg || !sg.id || !Array.isArray(sg.links)) continue;
+      for (const sl of sg.links) {
+        if (!sl || !sl.id || !sl.builtin) continue;
+        const home = (catalog.groups || []).find((cg) => (cg.links || []).some((l) => l.id === sl.id));
+        if (home && home.id !== sg.id) movedTo[sl.id] = sg.id;
+      }
+    }
+  }
   for (const cg of catalog.groups || []) {
     const sg = savedGroups[cg.id];
     const links = [];
@@ -133,6 +148,7 @@ window.CF_MERGE = function (saved, catalog) {
         if (!sl || !sl.id) continue;
         const cl = (cg.links || []).find((l) => l.id === sl.id);
         if (sl.builtin && (!cl || removed.has(sl.id))) continue; // убрана из каталога или пользователем
+        if (sl.builtin && cl && movedTo[sl.id] && movedTo[sl.id] !== cg.id) continue; // переехала в другую кнопку
         if (cl) {
           if (sl.edited) {
             // пользователь правит шаблон сам — каталог его не трогает
@@ -148,16 +164,21 @@ window.CF_MERGE = function (saved, catalog) {
         seen.add(sl.id);
       }
     }
-    for (const cl of cg.links || []) if (!seen.has(cl.id) && !removed.has(cl.id)) links.push({ ...cl });
-    // Видимость кнопки и своё название переживают обновления каталога.
-    // titleEdited = пользователь переименовал сам — каталог названия не трогает.
+    for (const cl of cg.links || []) {
+      if (seen.has(cl.id) || removed.has(cl.id)) continue;
+      if (movedTo[cl.id] && movedTo[cl.id] !== cg.id) continue; // переехала в другую кнопку
+      links.push({ ...cl });
+    }
+    // Миграция со старого showInPanel: спрятанная кнопка = все ссылки выключены.
+    if (sg && sg.showInPanel === false) links.forEach((l) => { l.enabled = false; });
+    // Своё название переживает обновления каталога.
+    // titleEdited = пользователь переименовал сам — каталог название не трогает.
     const titleEdited = !!(sg && sg.titleEdited);
     out.groups.push({
       id: cg.id,
       title: (titleEdited && sg.title) ? sg.title : cg.title,
       title_en: (titleEdited && sg.title_en) ? sg.title_en : cg.title_en,
       titleEdited,
-      showInPanel: !sg || sg.showInPanel !== false,
       links,
     });
   }

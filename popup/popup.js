@@ -126,8 +126,10 @@ function normalizeState(s) {
     if (typeof g.title !== 'string' || !g.title) g.title = g.id;
     if (typeof g.title_en !== 'string' || !g.title_en) g.title_en = g.title;
     if (typeof g.titleEdited !== 'boolean') g.titleEdited = false;
-    if (g.showInPanel !== false) g.showInPanel = true;
     if (!Array.isArray(g.links)) g.links = [];
+    // Миграция со старого showInPanel: спрятанная кнопка = все ссылки выключены.
+    if (g.showInPanel === false) g.links.forEach((l) => { l.enabled = false; });
+    delete g.showInPanel;
     for (const l of g.links) {
       if (typeof l.enabled !== 'boolean') l.enabled = true;
       if (typeof l.name !== 'string' || !l.name) l.name = prettyNameFromUrl(l.url || 'https://example.com');
@@ -361,9 +363,10 @@ function mirrorBlock(l) {
   return wrap;
 }
 
-// Форма правки записи: имя + URL + режим запроса. У встроенных шаблон
-// помечается l.edited — слияние каталога его больше не перезаписывает.
-function editForm(l) {
+// Форма правки записи: имя + URL + режим запроса + кнопка (перенос в другую группу).
+// У встроенных шаблон помечается l.edited — слияние каталога его больше не перезаписывает,
+// а переезд запоминается — каталог ссылку обратно не возвращает.
+function editForm(l, g) {
   const form = document.createElement('div');
   form.className = 'eform';
   const nameIn = document.createElement('input');
@@ -384,6 +387,15 @@ function editForm(l) {
   qSel.appendChild(optAuto);
   qSel.appendChild(optTitle);
   qSel.value = l.qmode === 'title' ? 'title' : '';
+  const gSel = document.createElement('select');
+  gSel.title = tr('move_to');
+  for (const gg of state.groups) {
+    const o = document.createElement('option');
+    o.value = gg.id;
+    o.textContent = `${tr('move_to')}: ${groupTitle(gg)}`;
+    gSel.appendChild(o);
+  }
+  gSel.value = g.id;
   const btns = document.createElement('div');
   btns.className = 'erow';
   const ok = document.createElement('button');
@@ -397,6 +409,7 @@ function editForm(l) {
   form.appendChild(nameIn);
   form.appendChild(urlIn);
   form.appendChild(qSel);
+  form.appendChild(gSel);
   form.appendChild(btns);
   ok.onclick = async () => {
     const url = normalizeUrl(urlIn.value);
@@ -407,6 +420,13 @@ function editForm(l) {
     else delete l.qmode;
     if (l.builtin) l.edited = true;
     l.updatedAt = Date.now();
+    if (gSel.value !== g.id) {
+      const dst = state.groups.find((x) => x.id === gSel.value);
+      if (dst) {
+        g.links.splice(g.links.indexOf(l), 1);
+        dst.links.push(l);
+      }
+    }
     await save(); render(); say(tr('saved'));
   };
   cancel.onclick = () => render();
@@ -418,9 +438,9 @@ function render() {
   state.groups.forEach((g) => {
     const box = document.createElement('div');
     box.className = 'group';
-    // Шапка группы: название + галочка «показывать кнопкой» + ✎ переименовать.
-    // Так любую из трёх кнопок можно скрыть или отдать под своё
-    // (например, выключить все торренты и назвать кнопку по-своему).
+    // Шапка группы: название + мастер-галочка (все ссылки вкл/выкл) + ✎ переименовать.
+    // Снял галочку с кнопки — погасли и все галочки внутри; поставил — включились все.
+    // Пустая кнопка (все выключены) в панели не рисуется.
     const hrow = document.createElement('div');
     hrow.className = 'ghrow';
     const h = document.createElement('h2');
@@ -428,15 +448,18 @@ function render() {
     hrow.appendChild(h);
     const showLbl = document.createElement('label');
     showLbl.className = 'gshow';
-    showLbl.title = tr('show_group');
+    showLbl.title = tr('toggle_all');
     const showCb = document.createElement('input');
     showCb.type = 'checkbox';
-    showCb.checked = g.showInPanel !== false;
-    showCb.onchange = async () => { g.showInPanel = showCb.checked; await save(); render(); say(tr('saved')); };
-    const showT = document.createElement('span');
-    showT.textContent = '✓';
+    const onCount = g.links.filter((l) => l.enabled).length;
+    showCb.checked = g.links.length > 0 && onCount === g.links.length;
+    showCb.indeterminate = onCount > 0 && onCount < g.links.length;
+    showCb.onchange = async () => {
+      const v = showCb.checked;
+      g.links.forEach((l) => { l.enabled = v; });
+      await save(); render(); say(tr('saved'));
+    };
     showLbl.appendChild(showCb);
-    showLbl.appendChild(showT);
     hrow.appendChild(showLbl);
     const renB = document.createElement('button');
     renB.className = 'mini';
@@ -555,7 +578,7 @@ function render() {
         if (formHost) { formHost.remove(); formHost = null; return; }
         formHost = document.createElement('div');
         formHost.className = 'ehost';
-        formHost.appendChild(editForm(l));
+        formHost.appendChild(editForm(l, g));
         row.after(formHost);
       };
     });

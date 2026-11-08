@@ -476,10 +476,9 @@
     head.appendChild(close);
     card.appendChild(head);
 
-    // body groups: скрытые кнопкой и пустые (все выключены) не рисуем вообще
+    // body groups: пустые (все выключены) не рисуем вообще
     const body = el('div', 'cf-body');
     for (const g of state.groups) {
-      if (g.showInPanel === false) continue;
       const picked = pickMainLink(g.links, myRoot) || {};
       const { main, all } = picked;
       if (!main) continue;

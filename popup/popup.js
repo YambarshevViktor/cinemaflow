@@ -10,8 +10,10 @@ const SITE_GROUPS = [
   { label: 'Kinorium', hosts: ['kinorium.com', 'kinorium.net'] },
   { label: 'IMDb', hosts: ['imdb.com'] },
   { label: 'TMDB', hosts: ['themoviedb.org'] },
-  { label: 'Letterboxd', hosts: ['letterboxd.com'] }
+  { label: 'Letterboxd', hosts: ['letterboxd.com'] },
+  { label: 'HDRezka', hosts: ['hdrezka.ag', 'rezka.ag'], custom: true }
 ];
+const CUSTOM_SCRIPT_ID = 'cinemaflow-custom';
 
 let state = null;
 let health = {};
@@ -61,6 +63,75 @@ function shortUrl(u) {
 function hostOf(u) {
   try { return new URL(String(u).replace('%s', 'test')).hostname.replace(/^www\./, ''); }
   catch (e) { return ''; }
+}
+
+// Базовый домен грубо: последние 2 части (ua.kinorium.com -> kinorium.com).
+// Та же логика, что в панели, — чтобы своё зеркало совпадало с проверкой hidden там.
+function baseDomain(host) {
+  const parts = String(host || '').toLowerCase().replace(/^www\./, '').split('.').filter(Boolean);
+  if (parts.length <= 2) return parts.join('.');
+  return parts.slice(-2).join('.');
+}
+
+// Свои зеркала — через динамический content-script: домены заранее неизвестны,
+// поэтому просим разрешение только на этот хост и регистрируем скрипт на него.
+async function registerCustomScripts() {
+  try {
+    if (!chrome.scripting?.registerContentScripts) return;
+    try { await chrome.scripting.unregisterContentScripts({ ids: [CUSTOM_SCRIPT_ID] }); } catch (e) {}
+    const hosts = state.customSiteHosts || [];
+    if (!hosts.length) return;
+    const matches = [];
+    for (const h of hosts) matches.push(`https://${h}/*`, `https://*.${h}/*`);
+    await chrome.scripting.registerContentScripts([{
+      id: CUSTOM_SCRIPT_ID,
+      matches,
+      js: ['common/shared.js', 'content/panel.js'],
+      runAt: 'document_idle',
+      persistAcrossSessions: true
+    }]);
+  } catch (e) {}
+}
+
+async function addCustomSiteHost(inp) {
+  let h = String(inp?.value ?? '').trim().toLowerCase();
+  h = h.replace(/^https?:\/\//i, '');
+  h = h.split('/')[0].split('?')[0].split('#')[0].trim().replace(/\.$/, '');
+  if (h.startsWith('www.')) h = h.slice(4);
+  if (!isValidHost(h)) { say(tr('bad_url'), 2500); if (inp) flagBad(inp); return; }
+  h = baseDomain(h);
+  const defaults = new Set(SITE_GROUPS.flatMap((sg) => sg.hosts));
+  if (defaults.has(h) || (state.customSiteHosts || []).includes(h)) {
+    // Уже есть: просто показываем (снимаем скрытие, если было).
+    state.hidden = (state.hidden || []).filter((x) => x !== h);
+    await save();
+    render();
+    say(tr('saved'));
+    return;
+  }
+  let granted = true;
+  try {
+    if (chrome.permissions?.request) {
+      granted = await chrome.permissions.request({ origins: [`https://${h}/*`, `https://*.${h}/*`] });
+    }
+  } catch (e) { granted = true; }
+  if (!granted) { say(tr('failed'), 2500); return; }
+  state.customSiteHosts = [...(state.customSiteHosts || []), h];
+  state.hidden = (state.hidden || []).filter((x) => x !== h);
+  await save();
+  await registerCustomScripts();
+  render();
+  say(tr('added'));
+}
+
+async function removeCustomSiteHost(h) {
+  state.customSiteHosts = (state.customSiteHosts || []).filter((x) => x !== h);
+  state.hidden = (state.hidden || []).filter((x) => x !== h);
+  await save();
+  await registerCustomScripts();
+  try { await chrome.permissions?.remove?.({ origins: [`https://${h}/*`, `https://*.${h}/*`] }); } catch (e) {}
+  render();
+  say(tr('removed'));
 }
 
 function fmtDate(ts) {
@@ -122,6 +193,7 @@ function normalizeState(s) {
   if (!s.lang) s.lang = 'ru';
   if (!Array.isArray(s.removed)) s.removed = [];
   if (!Array.isArray(s.hidden)) s.hidden = [];
+  if (!Array.isArray(s.customSiteHosts)) s.customSiteHosts = [];
   for (const g of s.groups) {
     if (typeof g.title !== 'string' || !g.title) g.title = g.id;
     if (typeof g.title_en !== 'string' || !g.title_en) g.title_en = g.title;
@@ -147,6 +219,7 @@ async function boot() {
   const raw = got[STATE_KEY] || got[OLD_STATE_KEY];
   state = normalizeState(raw ? window.CF_MERGE(raw, catalog) : { ...catalog, lang: 'ru' });
   await chrome.storage.local.set({ [STATE_KEY]: state });
+  await registerCustomScripts(); // самолечение: свои зеркала подключены, даже если фон не успел
   const hgot = await chrome.storage.local.get([HEALTH_KEY, OLD_HEALTH_KEY]);
   health = hgot[HEALTH_KEY] || hgot[OLD_HEALTH_KEY] || {};
   lastQuery = (await chrome.storage.local.get(LAST_KEY))[LAST_KEY] || null;
@@ -612,11 +685,11 @@ function render() {
     groupsEl.appendChild(box);
   });
 
-  // Секция «Сайты»: Kinorium (.com/.net) — одной группой-пилюлями, без дублей.
-  // Плюс поле для своих хостов (панель работает только на IMDb/Kinorium из манифеста).
+  // Секция «Сайты»: группы-пилюли без дублей. У HDRezka — свои зеркала:
+  // вписанный домен просит разрешение и подключает панель динамически.
   sitesEl.innerHTML = '';
   const hiddenSet = new Set(state.hidden || []);
-  const covered = new Set(SITE_GROUPS.flatMap((sg) => sg.hosts));
+  const covered = new Set([...SITE_GROUPS.flatMap((sg) => sg.hosts), ...(state.customSiteHosts || [])]);
   const toggleHost = async (h, show) => {
     if (show) state.hidden = (state.hidden || []).filter((x) => x !== h);
     else state.hidden = [...new Set([...(state.hidden || []), h])];
@@ -648,7 +721,48 @@ function render() {
       pill.appendChild(t);
       pills.appendChild(pill);
     }
+    if (sg.custom) {
+      for (const h of (state.customSiteHosts || [])) {
+        const pill = document.createElement('label');
+        pill.className = 'mchip';
+        pill.title = h;
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = !hiddenSet.has(h);
+        cb.onchange = () => toggleHost(h, cb.checked);
+        const t = document.createElement('span');
+        t.className = 'host';
+        t.textContent = h;
+        const x = document.createElement('button');
+        x.textContent = '✕';
+        x.title = tr('remove');
+        x.onclick = (e) => { e.preventDefault(); e.stopPropagation(); removeCustomSiteHost(h); };
+        pill.appendChild(cb);
+        pill.appendChild(t);
+        pill.appendChild(x);
+        pills.appendChild(pill);
+      }
+    }
     meta.appendChild(pills);
+    if (sg.custom) {
+      const form = document.createElement('div');
+      form.className = 'mform';
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.placeholder = tr('custom_site_ph');
+      const btn = document.createElement('button');
+      btn.className = 'ghost';
+      btn.textContent = tr('add');
+      btn.onclick = () => addCustomSiteHost(inp);
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') btn.click(); });
+      form.appendChild(inp);
+      form.appendChild(btn);
+      meta.appendChild(form);
+      const note = document.createElement('div');
+      note.className = 'addhint';
+      note.textContent = tr('sites_custom_hint');
+      meta.appendChild(note);
+    }
     row.appendChild(meta);
     sitesEl.appendChild(row);
   }
@@ -676,6 +790,7 @@ resetBtn.onclick = async () => {
   const lang = state.lang || 'ru';
   state = normalizeState({ ...catalog, lang });
   await save();
+  await registerCustomScripts(); // сброса касается и своих зеркал: пусто — скрипт снят
   applyStatic();
   render();
   say(tr('defaults_done'));

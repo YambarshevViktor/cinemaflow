@@ -112,6 +112,11 @@
     if (/kinorium\.(com|net)/.test(location.href) && /\/(film|movie|series|show)/i.test(location.href)) return true;
     if (/themoviedb\.org\/movie\/\d+/.test(location.href)) return true;
     if (/letterboxd\.com\/film\/[^/]+\/?($|\?)/.test(location.href)) return true;
+    // HDRezka и её зеркала (в т.ч. свои из настроек): /films/, /series/, /cartoons/…
+    // Отдельные серии там обычно на той же странице, JSON-LD/og:type выше уже покрыты.
+    if (/(^|\.)((hd)?rezka)\./.test(location.hostname)) {
+      if (/\/(films?|series|movies?|cartoons?|animation|anime|shows?)\//i.test(location.href)) return true;
+    }
     return false;
   }
 

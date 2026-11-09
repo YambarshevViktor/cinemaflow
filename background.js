@@ -25,6 +25,35 @@ function domainOf(urlTemplate) {
   }
 }
 
+// Свои зеркала HDRezka из настроек: домены заранее неизвестны, поэтому панель
+// на них подключаем динамически. Регистрация переживает перезапуск
+// (persistAcrossSessions), а тут — самолечение при установке/старте.
+async function syncCustomScripts() {
+  try {
+    if (!chrome.scripting?.registerContentScripts) return;
+    const got = await chrome.storage.local.get(['cinemaflow_state_v1', 'allfilm_state_v1']);
+    const st = got['cinemaflow_state_v1'] || got['allfilm_state_v1'];
+    const hosts = (st && st.customSiteHosts) || [];
+    const id = 'cinemaflow-custom';
+    try { await chrome.scripting.unregisterContentScripts({ ids: [id] }); } catch (e) {}
+    if (!hosts.length) return;
+    const matches = [];
+    for (const h of hosts) matches.push(`https://${h}/*`, `https://*.${h}/*`);
+    await chrome.scripting.registerContentScripts([{
+      id,
+      matches,
+      js: ['common/shared.js', 'content/panel.js'],
+      runAt: 'document_idle',
+      persistAcrossSessions: true
+    }]);
+  } catch (e) {}
+}
+
+try {
+  chrome.runtime.onInstalled.addListener(() => syncCustomScripts());
+  chrome.runtime.onStartup.addListener(() => syncCustomScripts());
+} catch (e) {}
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === 'OPEN_SETTINGS') {
     // Панель живет в Shadow DOM, popup программно не открыть — открываем полную страницу настроек.

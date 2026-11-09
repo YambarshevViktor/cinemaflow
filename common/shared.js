@@ -50,6 +50,8 @@ window.CF_STRINGS = {
     hidden_here: 'CinemaFlow скрыт здесь',
     show: 'Показать',
     sites: 'Сайты, где появляется панель',
+    custom_site_ph: 'Своё зеркало: hdrezka.xxx',
+    sites_custom_hint: 'Своё зеркало HDRezka: впишите домен — панель появится и там.',
     updated: 'изм.'
   },
   en: {
@@ -102,6 +104,8 @@ window.CF_STRINGS = {
     hidden_here: 'CinemaFlow hidden here',
     show: 'Show',
     sites: 'Sites where the panel appears',
+    custom_site_ph: 'Custom mirror: hdrezka.xxx',
+    sites_custom_hint: 'Custom HDRezka mirror: type its domain and the panel will appear there too.',
     updated: 'upd.'
   }
 };
@@ -121,7 +125,7 @@ window.CF_T = function (lang, key, vars) {
 // обновляются. Возвращает новое состояние.
 window.CF_MERGE = function (saved, catalog) {
   const removed = new Set((saved && saved.removed) || []);
-  const out = { v: catalog.v || 1, lang: (saved && saved.lang) || 'ru', removed: [...removed], hidden: (saved && saved.hidden) || [], groups: [] };
+  const out = { v: catalog.v || 1, lang: (saved && saved.lang) || 'ru', removed: [...removed], hidden: (saved && saved.hidden) || [], customSiteHosts: (saved && saved.customSiteHosts) || [], groups: [] };
   const savedGroups = {};
   if (saved && Array.isArray(saved.groups)) {
     for (const g of saved.groups) if (g && g.id) savedGroups[g.id] = g;

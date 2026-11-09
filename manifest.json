@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
   "name": "CinemaFlow — поиск фильма везде",
-  "version": "0.2",
-  "description": "Плавающая панель на странице фильма (IMDb, Kinorium, TMDB, Letterboxd): онлайн-кинотеатры, базы, торренты. Без встраивания в верстку сайтов.",
-  "permissions": ["storage"],
+  "version": "0.2.1",
+  "description": "Плавающая панель на странице фильма (IMDb, Kinorium, TMDB, Letterboxd, HDRezka): онлайн-кинотеатры, базы, торренты. Без встраивания в верстку сайтов.",
+  "permissions": ["storage", "scripting"],
+  "optional_host_permissions": ["https://*/*"],
   "action": {
     "default_popup": "popup/popup.html",
     "default_title": "CinemaFlow — настройки",
@@ -32,7 +33,11 @@
         "https://kinorium.net/*",
         "https://*.kinorium.net/*",
         "https://www.themoviedb.org/movie/*",
-        "https://letterboxd.com/film/*"
+        "https://letterboxd.com/film/*",
+        "https://hdrezka.ag/*",
+        "https://*.hdrezka.ag/*",
+        "https://rezka.ag/*",
+        "https://*.rezka.ag/*"
       ],
       "js": ["common/shared.js", "content/panel.js"],
       "run_at": "document_idle"
@@ -41,7 +46,7 @@
   "web_accessible_resources": [
     {
       "resources": ["defaults/catalog.json"],
-      "matches": ["https://www.imdb.com/*", "https://kinorium.com/*", "https://*.kinorium.com/*", "https://kinorium.net/*", "https://*.kinorium.net/*", "https://www.themoviedb.org/*", "https://letterboxd.com/*"]
+      "matches": ["https://*/*"]
     }
   ]
 }

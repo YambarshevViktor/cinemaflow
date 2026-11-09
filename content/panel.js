@@ -43,6 +43,18 @@
     }
   }
 
+  // Резка (включая свои зеркала из настроек): сезоны и серии живут на той же
+  // странице тайтла (плеер с выбором), а TVEpisode в её разметке — норма.
+  function isRezkaHost() {
+    const host = String(location.hostname || '').toLowerCase();
+    if (/(^|\.)((hd)?rezka)\./.test(host)) return true;
+    try {
+      const customs = (state && state.customSiteHosts) || [];
+      if (customs.length && customs.includes(baseDomain(host))) return true;
+    } catch (e) {}
+    return false;
+  }
+
   function faviconFor(urlTpl, size = 32) {
     // Прямой favicon сайта: гугл-сервис иконок возвращает «глобус» вместо
     // ошибки, и буква-аватар никогда не показывается. Тут либо иконка, либо буква.
@@ -114,7 +126,7 @@
     if (/letterboxd\.com\/film\/[^/]+\/?($|\?)/.test(location.href)) return true;
     // HDRezka и её зеркала (в т.ч. свои из настроек): /films/, /series/, /cartoons/…
     // Отдельные серии там обычно на той же странице, JSON-LD/og:type выше уже покрыты.
-    if (/(^|\.)((hd)?rezka)\./.test(location.hostname)) {
+    if (isRezkaHost()) {
       if (/\/(films?|series|movies?|cartoons?|animation|anime|shows?)\//i.test(location.href)) return true;
     }
     return false;
@@ -156,6 +168,9 @@
   }
 
   function isEpisodePage() {
+    // На резке сезоны/серии — на той же странице тайтла, а TVEpisode в разметке
+    // там норма: правило «прятать панель на страницах серий» к ней не применяем.
+    if (isRezkaHost()) return false;
     if (isEpisodeUrl()) return true;
     // Отдельная страница серии со своим id (напр. свой /title/tt.../ у IMDb):
     // по URL от фильма не отличить, смотрим JSON-LD.

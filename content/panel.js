@@ -63,8 +63,274 @@
     return `https://${h}/favicon.ico`;
   }
 
+  // ---------- названия: русское + оригинальное ----------
+  // На русских страницах (Kinorium «Оборотень», HDRezka) JSON-LD даёт русское
+  // название, а западный поиск (TMDB, Letterboxd, торренты) по нему ничего не
+  // находит. Поэтому достаём оба: title — как раньше, originalTitle — откуда
+  // получится. Нет оригинала — работаем как раньше, только по title.
+  const normTitle = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+  const hasLatin = (s) => /[a-zA-Z]/.test(String(s || ''));
+  const sameTitle = (a, b) => {
+    const x = normTitle(a).toLowerCase(), y = normTitle(b).toLowerCase();
+    return !!x && x === y;
+  };
+
+  // Чистим кандидата в оригинал: кавычки, прилипший год, мусор длиннее названия.
+  function cleanOriginal(s) {
+    let t = normTitle(s);
+    t = t.replace(/\s*\(\d{4}\)\s*$/, '').trim(); // сначала год, потом кавычки
+    t = t.replace(/^["'«“‘]+|["'»”’]+$/g, '').trim();
+    if (/[«»]/.test(t)) return ''; // обломок «...» — не название, а мусор
+    if (t.length < 2 || t.length > 120) return '';
+    return t;
+  }
+
+  // Кавычки-ёлочки вокруг всего названия: «Оборотень» -> Оборотень.
+  function stripWrapQuotes(s) {
+    const t = normTitle(s);
+    const m = t.match(/^«(.+)»$/s) || t.match(/^"(.+)"$/s);
+    return m ? normTitle(m[1]) : t;
+  }
+
+  // Скобки в конце названия: «Оборотень» (2026, Werwulf), Dune (2021).
+  // Год и оригинал — наружу, скобки — из названия. Латинская голова с
+  // негодовой скобкой («Dune (Part Two)») — подзаголовок, не трогаем.
+  function parenForm(s) {
+    const t = normTitle(s);
+    const m = t.match(/^(.*?)\s*\(([^()]{1,120})\)\s*$/);
+    if (!m) return null;
+    let head = stripWrapQuotes(m[1].trim().replace(/^(фильм|сериал|мультфильм)\s+(?=«)/i, ''));
+    if (!head || head.length > 120) return null;
+    const inner = m[2].trim();
+    if (!inner) return null;
+    const parts = inner.split(',').map((p) => normTitle(p)).filter(Boolean);
+    let year = '', original = '';
+    for (const p of parts) {
+      if (!year && /^\d{4}$/.test(p)) { year = p; continue; }
+      if (!original && hasLatin(p)) original = cleanOriginal(p);
+    }
+    if (hasLatin(head)) {
+      if (!year) return null;
+      return { title: head, original: '', year };
+    }
+    return { title: head, original, year };
+  }
+
+  // Хвост после года: «Оборотень (2026) Werwulf» — год в скобках посреди
+  // строки, оригинал болтается в конце без скобок. Латинскую голову
+  // («Dune (2021) Part Two») не трогаем. Короткие хвосты вроде «4K» — не название.
+  function tailForm(s) {
+    const t = normTitle(s);
+    const m = t.match(/^(.*?)\s*\((\d{4})\)\s*(.+)$/);
+    if (!m) return null;
+    const head = stripWrapQuotes(m[1].trim());
+    const tail = normTitle(m[3]);
+    if (!head || !tail || tail.length > 80) return null;
+    if (hasLatin(head) || !hasLatin(tail)) return null;
+    if (!/[a-zA-Z\u00C0-\u024F]{2}/.test(tail)) return null;
+    const orig = cleanOriginal(tail);
+    if (!orig || sameTitle(orig, head)) return null;
+    return { title: head, original: orig, year: m[2] };
+  }
+
+  // Имена из JSON-LD блоков про фильм/сериал. Оригинал лежит в alternateName,
+  // а у Кинориума — в alternativeHeadline (стандарт Schema.org для такого).
+  function jsonLdOriginals(mainTitle) {
+    const out = [];
+    try {
+      const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+      for (const s of scripts) {
+        let data;
+        try { data = JSON.parse(s.textContent); } catch (e) { continue; }
+        const arr = Array.isArray(data) ? data : (data && data['@graph'] ? data['@graph'] : [data]);
+        for (const o of arr) {
+          if (!o || typeof o !== 'object') continue;
+          const t = o['@type'];
+          const types = Array.isArray(t) ? t : [t];
+          const isMovie = types.some((x) => ['Movie', 'TVSeries', 'TVEpisode', 'TVSeason'].includes(x));
+          if (isMovie && o.name) {
+            const n = normTitle(o.name);
+            if (n && !sameTitle(n, mainTitle)) out.push(n);
+          }
+          for (const key of ['alternateName', 'alternativeHeadline', 'alternativeTitle']) {
+            const v = o[key];
+            if (v === undefined) continue;
+            const alts = Array.isArray(v) ? v : [v];
+            for (const a of alts) {
+              const n = normTitle(a && (typeof a === 'string' ? a : a.name));
+              if (n && !sameTitle(n, mainTitle)) out.push(n);
+            }
+          }
+        }
+      }
+    } catch (e) { /* ignore */ }
+    return out;
+  }
+
+  // Кнопка «Скопировать название» у Кинориума: data-copy-text="Оборотень (Werwulf)".
+  function copyTextOriginal() {
+    try {
+      const btn = document.querySelector('[data-copy-text]');
+      const v = btn ? normTitle(btn.getAttribute('data-copy-text')) : '';
+      if (!v || v.length > 120) return '';
+      const pc = parenForm(v) || tailForm(v);
+      if (pc && pc.original) return pc.original;
+      return v;
+    } catch (e) { /* ignore */ }
+    return '';
+  }
+
+  // IMDb кладёт оба названия в __NEXT_DATA__: titleText vs originalTitleText.
+  function nextDataOriginal(mainTitle) {
+    try {
+      if (!/(^|\.)imdb\.com$/.test(cleanHost(location.hostname))) return '';
+      const nd = document.getElementById('__NEXT_DATA__');
+      if (!nd?.textContent) return '';
+      const data = JSON.parse(nd.textContent);
+      let origText = '';
+      const stack = [data];
+      while (stack.length) {
+        const o = stack.pop();
+        if (!o || typeof o !== 'object') continue;
+        for (const k of Object.keys(o)) {
+          const v = o[k];
+          if (k === 'originalTitleText' && v && typeof v.text === 'string' && !origText) {
+            origText = normTitle(v.text);
+          } else if (v && typeof v === 'object') {
+            stack.push(v);
+          }
+        }
+      }
+      if (origText && !sameTitle(origText, mainTitle)) return origText;
+    } catch (e) { /* ignore */ }
+    return '';
+  }
+
+  // Подписанный оригинал на странице: «Исходное название Werwulf» (TMDB),
+  // «Оригинальное название: ...», «Original Title ...».
+  function labeledOriginal(mainTitle) {
+    try {
+      const labelRe = /^(оригинальное название|исходное название|original title)\s*:?\s*(.+)$/i;
+      const sels = 'p, li, dt, dd, td, [itemprop="alternativeHeadline"], .original-title, .film-original-title, .b-post__origtitle';
+      const found = document.querySelectorAll(sels);
+      if (found.length > 5000) return ''; // параноидально большая страница — пропускаем
+      for (const node of found) {
+        const txt = normTitle(node.textContent).slice(0, 200);
+        const m = txt.match(labelRe);
+        if (!m) continue;
+        const cand = cleanOriginal(m[2]);
+        if (cand && !sameTitle(cand, mainTitle)) return cand;
+      }
+    } catch (e) { /* ignore */ }
+    // Подпись и значение часто лежат в разных узлах (span подписи + span
+    // значения) — идём TreeWalker'ом по текстовым узлам.
+    try {
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+        acceptNode(n) {
+          const t = n.nodeValue || '';
+          if (!t || t.length > 300) return NodeFilter.FILTER_SKIP;
+          return /оригинальное название|исходное название|original title/i.test(t)
+            ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+        }
+      });
+      let node;
+      let guard = 0;
+      while ((node = walker.nextNode()) && guard++ < 50) {
+        const txt = normTitle(node.nodeValue);
+        const m = txt.match(/^(оригинальное название|исходное название|original title)\s*:?\s*(.*)$/i);
+        if (!m) continue;
+        let cand = normTitle(m[2]);
+        if (!cand) {
+          // Значение в соседних узлах: сначала братья, потом весь родитель.
+          let sib = node.nextSibling;
+          let hops = 0;
+          while (sib && hops++ < 3 && !cand) {
+            const t = normTitle(sib.textContent);
+            if (t && t.length <= 120) cand = t;
+            sib = sib.nextSibling;
+          }
+          if (!cand && node.parentElement) {
+            const pt = normTitle(node.parentElement.textContent);
+            if (pt.length <= 150) cand = pt.replace(/^(оригинальное название|исходное название|original title)\s*:?\s*/i, '');
+          }
+        }
+        cand = cleanOriginal(cand);
+        if (cand && !sameTitle(cand, mainTitle)) return cand;
+      }
+    } catch (e) { /* ignore */ }
+    return '';
+  }
+
+  // Русскоязычные сайты (Kinorium, HDRezka) часто показывают оригинал мелкой
+  // строкой рядом с h1 без всякой подписи. Ищем короткую латиницу в том же
+  // блоке, что и заголовок. Только для этих хостов — на IMDb/TMDB и так есть
+  // надёжные источники, а тут блок заголовка простой и риск мусора минимален.
+  function isRuTitleHost() {
+    try {
+      const h = cleanHost(location.hostname);
+      if (/(^|\.)kinorium\.(com|net)$/.test(h)) return true;
+      return isRezkaHost();
+    } catch (e) { return false; }
+  }
+
+  function titleBlockOriginal(title) {
+    try {
+      if (!isRuTitleHost()) return '';
+      const h1s = document.querySelectorAll('h1');
+      for (const h1 of h1s) {
+        const h1t = normTitle(h1.textContent);
+        if (!h1t || (!h1t.includes(title) && !sameTitle(h1t, title))) continue;
+        const scope = h1.parentElement;
+        if (!scope) continue;
+        const kids = [...scope.children].filter((k) => k !== h1);
+        kids.unshift(h1); // оригинал может быть span'ом внутри самого h1
+        for (const k of kids) {
+          const texts = [];
+          for (const n of k.childNodes) {
+            if (n.nodeType === 3) {
+              const t = normTitle(n.nodeValue);
+              if (t) texts.push(t);
+            } else if (n.tagName && /^(SPAN|DIV|SMALL)$/.test(n.tagName)) {
+              const t = normTitle(n.textContent);
+              if (t && t.length <= 80) texts.push(t);
+            }
+          }
+          for (const t of texts) {
+            for (const raw of t.split(/[,·|]/)) {
+              const part = cleanOriginal(normTitle(raw).replace(/\s*\(\d{4}\)\s*$/, ''));
+              if (!part || part.length < 2 || part.length > 80) continue;
+              if (!hasLatin(part) || sameTitle(part, title)) continue;
+              // Метаданные («IMDb: 6.5», «2h 34m»), а не название.
+              if (/imdb|кинопоиск|^\d|\d+\s*(h|ч|м|min|мин)\b/i.test(part)) continue;
+              if (!/[a-zA-Z\u00C0-\u024F]{2}/.test(part)) continue; // «4K», «3D» — не название
+              return part;
+            }
+          }
+        }
+      }
+    } catch (e) { /* ignore */ }
+    return '';
+  }
+
+  // «Оборотень / Werwulf»: нелатиница — название, латиница — оригинал.
+  // Только смешанный вариант: «AC/DC» и подобное не трогаем.
+  function slashOriginal(title) {
+    const parts = String(title || '').split('/').map(normTitle).filter(Boolean);
+    if (parts.length !== 2) return null;
+    const [a, b] = parts;
+    if (a.length > 120 || b.length > 120) return null;
+    if (!hasLatin(a) && hasLatin(b) && !sameTitle(a, b)) {
+      return { title: a, original: cleanOriginal(b) };
+    }
+    if (hasLatin(a) && !hasLatin(b) && !sameTitle(a, b)) {
+      return { title: b, original: cleanOriginal(a) };
+    }
+    return null;
+  }
+
   function getMovieInfo() {
-    // 1. JSON-LD
+    // 1. JSON-LD (название и год — как раньше)
+    let base = null;
     try {
       const scripts = document.querySelectorAll('script[type="application/ld+json"]');
       for (const s of scripts) {
@@ -85,27 +351,89 @@
                   const urlm = location.href.match(/season[-_]?(\d+).*episode[-_]?(\d+)/i);
                   if (urlm) extra = ` S${String(urlm[1]).padStart(2, '0')}E${String(urlm[2]).padStart(2, '0')}`;
                 }
-                return { title: title + extra, year };
+                base = { title: title + extra, year };
+                break;
               }
             }
           }
         } catch (e) { /* next script */ }
+        if (base) break;
       }
     } catch (e) { /* ignore */ }
     // 2. og:title
-    const og = document.querySelector('meta[property="og:title"]');
-    if (og?.content?.trim()) {
-      return splitTitleYear(og.content.trim());
+    if (!base) {
+      const og = document.querySelector('meta[property="og:title"]');
+      if (og?.content?.trim()) base = splitTitleYear(og.content.trim());
     }
     // 3. document.title: "Dune (2021) - IMDb" -> "Dune", "2021"
-    if (document.title) return splitTitleYear(document.title);
-    return { title: '', year: '' };
+    if (!base) {
+      if (document.title) base = splitTitleYear(document.title);
+      else return { title: '', originalTitle: '', year: '' };
+    }
+    if (!base.title) return { title: '', originalTitle: '', year: '' };
+
+    let { title, year } = base;
+    title = stripWrapQuotes(title);
+    // Скобки вида «(2026, Werwulf)» — год и оригинал оттуда, скобки из названия.
+    const pf = parenForm(title);
+    if (pf) {
+      title = pf.title;
+      if (!year && pf.year) year = pf.year;
+    }
+    // «A / B» в самом названии — сразу разбираем на русское + оригинал.
+    const slash = slashOriginal(title);
+    if (slash && slash.original) {
+      title = stripWrapQuotes(slash.title);
+      if (!year) {
+        const ym = String(base.title).match(/\((\d{4})\)/);
+        if (ym) year = ym[1];
+      }
+    }
+    // Хвост вида «(2026) Werwulf» после названия.
+    const tf = tailForm(title);
+    if (tf) {
+      title = tf.title;
+      if (!year && tf.year) year = tf.year;
+    }
+    // Кандидаты в оригинал: скобки, хвост, слэш, JSON-LD, IMDb-данные, подпись,
+    // строка у заголовка (Kinorium/HDRezka), og:title.
+    const cands = [];
+    if (pf && pf.original) cands.push(pf.original);
+    if (tf && tf.original) cands.push(tf.original);
+    if (slash && slash.original) cands.push(slash.original);
+    cands.push(...jsonLdOriginals(title));
+    const nd = nextDataOriginal(title);
+    if (nd) cands.push(nd);
+    const lab = labeledOriginal(title);
+    if (lab) cands.push(lab);
+    const tb = titleBlockOriginal(title);
+    if (tb) cands.push(tb);
+    const ct = copyTextOriginal();
+    if (ct) cands.push(ct);
+    try {
+      const ogt = document.querySelector('meta[property="og:title"]')?.content?.trim();
+      if (ogt && !sameTitle(ogt, title)) {
+        const parsed = splitTitleYear(ogt);
+        // Сырьём: скобки разберёт цикл ниже (чистить тут — убить «(2026, Werwulf)»).
+        if (!hasLatin(title) && hasLatin(parsed.title) && parsed.title.length <= 200) cands.push(parsed.title);
+      }
+    } catch (e) { /* ignore */ }
+
+    let originalTitle = '';
+    for (const c of cands) {
+      // Кандидат-мусор вида «X» (2026, Y) или «X (2026) Y» разбираем как название.
+      const pc = parenForm(c) || tailForm(c);
+      const t = (pc && pc.original) ? pc.original : cleanOriginal(c);
+      if (t && !sameTitle(t, title)) { originalTitle = t; break; }
+    }
+    return { title, originalTitle, year };
   }
 
   function splitTitleYear(raw) {
     let t = raw.replace(/\s*-\s*(IMDb|Kinorium).*$/i, '').trim();
     let year = '';
-    const m = t.match(/\((\d{4})\)/);
+    // Год в скобках, в т.ч. «(фильм, 2026)». Но не «(2026, Werwulf)» — это parenForm.
+    const m = t.match(/\(\s*(?:[^()]*?,\s*)?(\d{4})\s*\)/);
     if (m) { year = m[1]; t = t.replace(m[0], '').trim(); }
     return { title: t, year };
   }
@@ -180,12 +508,32 @@
     return false;
   }
 
-  function buildSearchUrl(link, title, year, tplOverride) {
+  // Западным сайтам и трекерам — английское название, если оно есть:
+  // «Оборотень» в TMDB не ищется, а «Werwulf» находится сразу. Своим и русским —
+  // русское. Язык можно перебить у каждой ссылки в настройках (qLang).
+  const EN_HOSTS = ['imdb.com', 'letterboxd.com', 'themoviedb.org', 'rottentomatoes.com', 'metacritic.com', 'justwatch.com', 'therarbg.com', 'ext.to', 'bt4g.org'];
+
+  function wantsEnglish(link, tpl) {
+    if (link.qLang === 'en') return true;
+    if (link.qLang === 'ru') return false;
+    try {
+      const h = cleanHost(new URL(String(tpl).replace('%s', 'test')).hostname);
+      return EN_HOSTS.some((e) => h === e || h.endsWith('.' + e));
+    } catch (e) { return false; }
+  }
+
+  function pickQueryTitle(link, info, tpl) {
+    if (wantsEnglish(link, tpl)) return info.originalTitle || info.title;
+    return info.title || info.originalTitle;
+  }
+
+  function buildSearchUrl(link, info, tplOverride) {
     const tpl = tplOverride || effUrl(link);
     // Обычная ссылка без %s — открываем как есть (прямой переход, без подстановки).
     if (!String(tpl).includes('%s')) return tpl;
     // Некоторым сайтам год в запросе мешает (напр. TMDB) — для них только название.
-    const q = (link.qmode === 'title' || !year) ? title : [title, year].join(' ');
+    const base = pickQueryTitle(link, info, tpl);
+    const q = (link.qmode === 'title' || !info.year) ? base : [base, info.year].join(' ');
     return tpl.replace('%s', encodeURIComponent(String(q).trim()));
   }
 
@@ -460,15 +808,18 @@
       return;
     }
 
-    const { title, year } = getMovieInfo();
+    const info = getMovieInfo();
+    const { title, year } = info;
     if (!title) {
       if (host.shadowRoot) host.shadowRoot.innerHTML = '';
       return;
     }
-    const queryText = [title, year].filter(Boolean).join(' ');
+    const headTitle = (info.originalTitle && !sameTitle(info.originalTitle, title))
+      ? `${title} / ${info.originalTitle}` : title;
+    const queryText = [headTitle, year].filter(Boolean).join(' ');
 
     // Запоминаем для кнопки «Копировать название» в настройках.
-    try { chrome.storage.local.set({ [LAST_KEY]: { text: queryText, title, year, url: location.href, ts: Date.now() } }); } catch (e) {}
+    try { chrome.storage.local.set({ [LAST_KEY]: { text: queryText, title, originalTitle: info.originalTitle || '', year, url: location.href, ts: Date.now() } }); } catch (e) {}
 
     // Переиспользуем shadow root: повторный attachShadow бросает исключение
     // и панель «замирает» (это и была вечная «Проверяю…»).
@@ -482,7 +833,7 @@
 
     // head
     const head = el('div', 'cf-head');
-    const titleBox = el('div', 'cf-title', title);
+    const titleBox = el('div', 'cf-title', headTitle);
     const sub = el('span', 'cf-sub', year ? `${year} · ${myRoot}` : myRoot);
     titleBox.appendChild(sub);
     const close = el('button', 'cf-close', '✕');
@@ -519,7 +870,7 @@
         } catch (e) {}
         mainPart.onclick = (e) => {
           e.stopPropagation();
-          window.open(buildSearchUrl(main, title, year), '_blank', 'noopener');
+          window.open(buildSearchUrl(main, info), '_blank', 'noopener');
         };
       }
       const arrow = el('span', 'cf-arrow', '▾');
@@ -543,7 +894,7 @@
         if (!here) {
           item.onclick = (e) => {
             e.stopPropagation();
-            window.open(buildSearchUrl(link, title, year, tpl), '_blank', 'noopener');
+            window.open(buildSearchUrl(link, info, tpl), '_blank', 'noopener');
             drop.classList.remove('open');
           };
         }

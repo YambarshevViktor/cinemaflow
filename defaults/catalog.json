@@ -1,5 +1,5 @@
 {
-  "v": 5,
+  "v": 6,
   "groups": [
     {
       "id": "cinemas",
@@ -20,12 +20,12 @@
       "title_en": "Databases",
       "links": [
         { "id": "kinorium", "name": "Kinorium", "url": "https://www.kinorium.com/search/?q=%s", "enabled": true, "builtin": true },
-        { "id": "imdb", "name": "IMDb", "url": "https://www.imdb.com/find/?q=%s", "enabled": true, "builtin": true },
-        { "id": "letterboxd", "name": "Letterboxd", "url": "https://letterboxd.com/search/films/%s/", "enabled": true, "builtin": true },
-        { "id": "rottentomatoes", "name": "Rotten Tomatoes", "url": "https://www.rottentomatoes.com/search?search=%s", "enabled": false, "builtin": true },
-        { "id": "metacritic", "name": "Metacritic", "url": "https://www.metacritic.com/search/%s/", "enabled": false, "builtin": true },
-        { "id": "tmdb", "name": "TMDB", "url": "https://www.themoviedb.org/search?query=%s", "qmode": "title", "enabled": false, "builtin": true },
-        { "id": "justwatch", "name": "JustWatch", "url": "https://www.justwatch.com/us/search?q=%s", "enabled": false, "builtin": true }
+        { "id": "imdb", "name": "IMDb", "url": "https://www.imdb.com/find/?q=%s", "qLang": "en", "enabled": true, "builtin": true },
+        { "id": "letterboxd", "name": "Letterboxd", "url": "https://letterboxd.com/search/films/%s/", "qLang": "en", "enabled": true, "builtin": true },
+        { "id": "rottentomatoes", "name": "Rotten Tomatoes", "url": "https://www.rottentomatoes.com/search?search=%s", "qLang": "en", "enabled": false, "builtin": true },
+        { "id": "metacritic", "name": "Metacritic", "url": "https://www.metacritic.com/search/%s/", "qLang": "en", "enabled": false, "builtin": true },
+        { "id": "tmdb", "name": "TMDB", "url": "https://www.themoviedb.org/search?query=%s", "qmode": "title", "qLang": "en", "enabled": false, "builtin": true },
+        { "id": "justwatch", "name": "JustWatch", "url": "https://www.justwatch.com/us/search?q=%s", "qLang": "en", "enabled": false, "builtin": true }
       ]
     },
     {
@@ -35,9 +35,9 @@
       "links": [
         { "id": "rutracker", "name": "RuTracker", "url": "https://rutracker.org/forum/tracker.php?nm=%s", "mirrors": ["https://rutracker.net/forum/tracker.php?nm=%s"], "enabled": true, "builtin": true },
         { "id": "rutor", "name": "Rutor", "url": "https://rutor.is/search/%s", "mirrors": ["https://rutor.info/search/%s"], "enabled": true, "builtin": true },
-        { "id": "therarbg", "name": "TheRarBg", "url": "https://therarbg.com/get-posts/keywords:%s:category:Movies/", "enabled": true, "builtin": true },
-        { "id": "ext", "name": "Ext.to", "url": "https://ext.to/browse/?q=%s", "enabled": true, "builtin": true },
-        { "id": "bt4g", "name": "BT4G", "url": "https://bt4g.org/search/%s", "enabled": true, "builtin": true }
+        { "id": "therarbg", "name": "TheRarBg", "url": "https://therarbg.com/get-posts/keywords:%s:category:Movies/", "qLang": "en", "enabled": true, "builtin": true },
+        { "id": "ext", "name": "Ext.to", "url": "https://ext.to/browse/?q=%s", "qLang": "en", "enabled": true, "builtin": true },
+        { "id": "bt4g", "name": "BT4G", "url": "https://bt4g.org/search/%s", "qLang": "en", "enabled": true, "builtin": true }
       ]
     }
   ]

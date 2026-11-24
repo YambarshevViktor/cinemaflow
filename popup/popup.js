@@ -460,6 +460,23 @@ function editForm(l, g) {
   qSel.appendChild(optAuto);
   qSel.appendChild(optTitle);
   qSel.value = l.qmode === 'title' ? 'title' : '';
+  // Язык запроса: авто (западным — английское, своим и русским — русское),
+  // либо принудительно русское / английское.
+  const qLangSel = document.createElement('select');
+  qLangSel.title = tr('q_lang_auto');
+  const optLangAuto = document.createElement('option');
+  optLangAuto.value = '';
+  optLangAuto.textContent = tr('q_lang_auto');
+  const optLangRu = document.createElement('option');
+  optLangRu.value = 'ru';
+  optLangRu.textContent = tr('q_lang_ru');
+  const optLangEn = document.createElement('option');
+  optLangEn.value = 'en';
+  optLangEn.textContent = tr('q_lang_en');
+  qLangSel.appendChild(optLangAuto);
+  qLangSel.appendChild(optLangRu);
+  qLangSel.appendChild(optLangEn);
+  qLangSel.value = l.qLang === 'en' ? 'en' : l.qLang === 'ru' ? 'ru' : '';
   const gSel = document.createElement('select');
   gSel.title = tr('move_to');
   for (const gg of state.groups) {
@@ -482,6 +499,7 @@ function editForm(l, g) {
   form.appendChild(nameIn);
   form.appendChild(urlIn);
   form.appendChild(qSel);
+  form.appendChild(qLangSel);
   form.appendChild(gSel);
   form.appendChild(btns);
   ok.onclick = async () => {
@@ -491,6 +509,9 @@ function editForm(l, g) {
     l.url = url;
     if (qSel.value === 'title') l.qmode = 'title';
     else delete l.qmode;
+    if (qLangSel.value === 'en') l.qLang = 'en';
+    else if (qLangSel.value === 'ru') l.qLang = 'ru';
+    else delete l.qLang;
     if (l.builtin) l.edited = true;
     l.updatedAt = Date.now();
     if (gSel.value !== g.id) {
